@@ -74,7 +74,8 @@
             max-width: 100%;
             height: auto;
         }
-
+.canvas-scroll-wrapper { overflow: auto !important; }
+.canvas-wrapper { margin: 20px auto; }
         /* ==========================================
            SCROLLBAR
         ========================================== */
@@ -1047,6 +1048,183 @@
         .flex-between { display: flex; align-items: center; justify-content: space-between; }
         .gap-10 { gap: 10px; }
         .gap-20 { gap: 20px; }
+
+        /* ==========================================
+   MOBILE EDITOR FIX
+========================================== */
+
+@media (max-width: 768px) {
+    /* Toolbar küçült */
+    .editor-toolbar {
+        padding: 8px;
+        gap: 8px;
+        max-height: 45vh;
+        overflow-y: auto;
+        flex-wrap: wrap;
+    }
+    
+    .toolbar-group {
+        flex: 0 0 auto;
+    }
+    
+    .toolbar-label {
+        display: none;
+    }
+    
+    .tool-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+    
+    .toolbar-buttons {
+        gap: 3px;
+    }
+    
+    /* Style controls küçült */
+    .style-controls {
+        display: none;
+    }
+    
+    /* Save group */
+    .save-group {
+        width: 100%;
+        margin-left: 0;
+    }
+    
+    .save-group .btn {
+        flex: 1;
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+    
+    /* Canvas alanı - EN ÖNEMLİ */
+    #editorContainer {
+        height: calc(100vh - 120px) !important;
+        min-height: 300px !important;
+    }
+    
+    .editor-canvas-container {
+        flex: 1 !important;
+        min-height: 250px !important;
+    }
+    
+    .canvas-scroll-wrapper {
+        overflow: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .canvas-wrapper {
+        margin: 15px;
+    }
+    
+    /* Zoom controls */
+    #zoomSlider {
+        width: 50px !important;
+    }
+    
+    .zoom-level {
+        display: none;
+    }
+    
+    /* Page controls */
+    .page-info input {
+        width: 30px;
+    }
+}
+
+/* Çok küçük ekranlar */
+@media (max-width: 480px) {
+    .editor-toolbar {
+        max-height: 35vh;
+        padding: 5px;
+    }
+    
+    .tool-btn {
+        width: 28px;
+        height: 28px;
+        font-size: 12px;
+    }
+    
+    /* Bazı grupları gizle */
+    .toolbar-group:nth-child(n+5) {
+        display: none;
+    }
+    
+    .save-group {
+        display: flex !important;
+    }
+}
+
+/* ==========================================
+   MOBILE TOOLBAR TOGGLE - KESIN ÇÖZÜM
+========================================== */
+
+/* Toggle butonu */
+.toolbar-toggle {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    background: var(--accent);
+    border: none;
+    border-radius: 50%;
+    color: white;
+    font-size: 24px;
+    z-index: 9999;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    cursor: pointer;
+}
+
+/* Mobilde göster */
+@media (max-width: 768px) {
+    .toolbar-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* Toolbar gizle */
+    .editor-toolbar {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.95);
+        z-index: 9998;
+        padding: 20px;
+        overflow-y: auto;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .editor-toolbar.show {
+        display: flex;
+    }
+    
+    /* Toolbar açıkken buton X olsun */
+    .toolbar-toggle.active {
+        background: var(--danger);
+    }
+    
+    /* Editor container */
+    #editorContainer {
+        height: calc(100vh - 150px);
+    }
+    
+    .editor-canvas-container {
+        flex: 1;
+        min-height: 60vh;
+    }
+    
+    .canvas-scroll-wrapper {
+        overflow: auto !important;
+    }
+}
     </style>
 </head>
 <body>
@@ -1469,7 +1647,8 @@
 
     <!-- Toast Container -->
     <div class="toast-container" id="toastContainer"></div>
-
+<!-- Mobile Toolbar Toggle Button -->
+<button class="toolbar-toggle" id="toolbarToggle">🛠️</button>
     <!-- ==========================================
          CDN LIBRARIES
     ========================================== -->
