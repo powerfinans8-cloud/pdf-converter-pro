@@ -1,653 +1,699 @@
-/**
- * ============================================
- * ALL TO PDF CONVERTER PRO - CAMERA MODULE
- * ============================================
- * Kamera ile belge tarama ve PDF oluşturma
- * Native file input kullanılıyor (güvenlik kısıtlaması yok)
- */
+// ============================================
+// PDF CONVERTER PRO - CAMERA MODULE
+// ============================================
+// Version: 2.0 (Mobile Optimized)
+// Fotoğraf çekme ve PDF oluşturma
+// ============================================
 
-'use strict';
+(function() {
+    'use strict';
 
-// ==========================================
-// CAMERA MODULE
-// ==========================================
-const Camera = {
-    captures: [],
-    captureCounter: 0,
-    
-    /**
-     * Initialize module
-     */
-    init() {
-        this.bindEvents();
-    },
-    
-    /**
-     * Bind event listeners
-     */
-    bindEvents() {
-        // Camera input
-        const cameraInput = document.getElementById('cameraInput');
-        if (cameraInput) {
-            cameraInput.addEventListener('change', (e) => {
-                const files = Array.from(e.target.files);
-                if (files.length > 0) {
-                    this.processCaptures(files);
-                }
-                // Reset input for same file selection
-                e.target.value = '';
+    // ============================================
+    // GLOBAL VARIABLES
+    // ============================================
+    let videoStream = null;
+    let currentCamera = 'environment'; // 'environment' = arka, 'user' = ön
+    let capturedImages = [];
+    let isFlashOn = false;
+
+    // DOM Elements
+    let videoElement = null;
+    let canvasElement = null;
+    let canvasContext = null;
+
+    // ============================================
+    // INITIALIZATION
+    // ============================================
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('📷 Camera module initializing...');
+
+        videoElement = document.getElementById('cameraVideo');
+        canvasElement = document.getElementById('cameraCanvas');
+
+        if (canvasElement) {
+            canvasContext = canvasElement.getContext('2d', {
+                willReadFrequently: true
             });
         }
-        
-        // Convert to PDF button
-        const convertBtn = document.getElementById('cameraToPdfBtn');
-        if (convertBtn) {
-            convertBtn.addEventListener('click', () => this.convertToPDF());
+
+        initCameraButtons();
+        console.log('✅ Camera module initialized');
+    });
+
+    // ============================================
+    // BUTTON HANDLERS
+    // ============================================
+    function initCameraButtons() {
+        // Start camera button
+        const startBtn = document.getElementById('startCameraBtn');
+        if (startBtn) {
+            startBtn.addEventListener('click', startCamera);
         }
-    },
-    
-    /**
-     * Process captured images
-     */
-    async processCaptures(files) {
-        for (const file of files) {
-            if (!file.type.startsWith('image/')) continue;
-            
-            try {
-                this.captureCounter++;
-                
-                const thumbnail = await this.createThumbnail(file);
-                const dimensions = await this.getImageDimensions(file);
-                
-                this.captures.push({
-                    id: Utils.generateId(),
-                    file: file,
-                    name: `Scan_${this.captureCounter}`,
-                    originalName: file.name,
-                    size: file.size,
-                    thumbnail: thumbnail,
-                    number: this.captureCounter,
-                    rotation: 0,
-                    width: dimensions.width,
-                    height: dimensions.height,
-                    timestamp: Date.now()
-                });
-                
-            } catch (error) {
-                console.error('Error processing capture:', error);
+
+        // Capture button
+        const captureBtn = document.getElementById('captureBtn');
+        if (captureBtn) {
+            captureBtn.addEventListener('click', capturePhoto);
+        }
+
+        // Switch camera button
+        const switchBtn = document.getElementById('switchCameraBtn');
+        if (switchBtn) {
+            switchBtn.addEventListener('click', switchCamera);
+        }
+
+        // Create PDF button
+        const createPdfBtn = document.getElementById('createScanPdfBtn');
+        if (createPdfBtn) {
+            createPdfBtn.addEventListener('click', createPdfFromCaptures);
+        }
+    }
+
+    // ============================================
+    // START CAMERA
+    // ============================================
+    async function startCamera() {
+        try {
+            // Stop any existing stream
+            stopCamera();
+
+            showToast('Kamera başlatılıyor...', 'info');
+
+            // Camera constraints
+            const constraints = {
+                video: {
+                    facingMode: currentCamera,
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                },
+                audio: false
+            };
+
+            // Request camera access
+            videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+            // Set video source
+            if (videoElement) {
+                videoElement.srcObject = videoStream;
+                videoElement.setAttribute('playsinline', true);
+                videoElement.setAttribute('autoplay', true);
+                videoElement.muted = true;
+
+                // Wait for video to be ready
+                videoElement.onloadedmetadata = function() {
+                    videoElement.play();
+                    updateButtonStates(true);
+                    showToast('Kamera hazır!', 'success');
+                };
             }
+
+        } catch (error) {
+            console.error('Camera error:', error);
+            
+            if (error.name === 'NotAllowedError') {
+                showToast('Kamera izni verilmedi', 'error');
+            } else if (error.name === 'NotFoundError') {
+                showToast('Kamera bulunamadı', 'error');
+            } else if (error.name === 'NotSupportedError') {
+                showToast('Kamera desteklenmiyor', 'error');
+            } else {
+                showToast('Kamera başlatılamadı: ' + error.message, 'error');
+            }
+
+            updateButtonStates(false);
         }
+    }
+
+    // ============================================
+    // STOP CAMERA
+    // ============================================
+    function stopCamera() {
+        if (videoStream) {
+            videoStream.getTracks().forEach(track => {
+                track.stop();
+            });
+            videoStream = null;
+        }
+
+        if (videoElement) {
+            videoElement.srcObject = null;
+        }
+
+        updateButtonStates(false);
+    }
+
+    // ============================================
+    // SWITCH CAMERA (Front/Back)
+    // ============================================
+    async function switchCamera() {
+        currentCamera = currentCamera === 'environment' ? 'user' : 'environment';
         
-        this.renderCaptureList();
-        Toast.success(`${files.length} photo${files.length > 1 ? 's' : ''} captured`);
-    },
-    
-    /**
-     * Create thumbnail from image
-     */
-    createThumbnail(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            
-            reader.onload = (e) => {
-                const img = new Image();
-                
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    // Thumbnail size
-                    const maxSize = 120;
-                    let width = img.width;
-                    let height = img.height;
-                    
-                    if (width > height) {
-                        if (width > maxSize) {
-                            height = (height * maxSize) / width;
-                            width = maxSize;
-                        }
-                    } else {
-                        if (height > maxSize) {
-                            width = (width * maxSize) / height;
-                            height = maxSize;
-                        }
-                    }
-                    
-                    canvas.width = width;
-                    canvas.height = height;
-                    ctx.drawImage(img, 0, 0, width, height);
-                    
-                    resolve(canvas.toDataURL('image/jpeg', 0.8));
-                };
-                
-                img.onerror = reject;
-                img.src = e.target.result;
-            };
-            
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    },
-    
-    /**
-     * Get image dimensions
-     */
-    getImageDimensions(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            
-            reader.onload = (e) => {
-                const img = new Image();
-                
-                img.onload = () => {
-                    resolve({ width: img.width, height: img.height });
-                };
-                
-                img.onerror = reject;
-                img.src = e.target.result;
-            };
-            
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-        });
-    },
-    
-    /**
-     * Render capture list
-     */
-    renderCaptureList() {
-        const container = document.getElementById('cameraList');
-        const controls = document.getElementById('cameraControls');
+        showToast(currentCamera === 'user' ? 'Ön kamera' : 'Arka kamera', 'info');
         
-        if (!container) return;
-        
-        container.innerHTML = '';
-        
-        if (this.captures.length === 0) {
-            if (controls) controls.style.display = 'none';
+        await startCamera();
+    }
+
+    // ============================================
+    // CAPTURE PHOTO
+    // ============================================
+    function capturePhoto() {
+        if (!videoElement || !videoElement.videoWidth) {
+            showToast('Kamera hazır değil', 'warning');
             return;
         }
-        
-        if (controls) controls.style.display = 'flex';
-        
-        // Update numbers based on current order
-        this.captures.forEach((capture, index) => {
-            capture.number = index + 1;
-        });
-        
-        this.captures.forEach((capture, index) => {
+
+        try {
+            // Set canvas size to video size
+            const videoWidth = videoElement.videoWidth;
+            const videoHeight = videoElement.videoHeight;
+
+            canvasElement.width = videoWidth;
+            canvasElement.height = videoHeight;
+
+            // Clear canvas
+            canvasContext.clearRect(0, 0, videoWidth, videoHeight);
+
+            // Draw video frame to canvas (NO FILTERS - CLEAN CAPTURE)
+            canvasContext.drawImage(videoElement, 0, 0, videoWidth, videoHeight);
+
+            // Get image data as JPEG (better quality, no color issues)
+            const imageDataURL = canvasElement.toDataURL('image/jpeg', 0.92);
+
+            // Add to captured images
+            const imageData = {
+                id: Date.now(),
+                dataURL: imageDataURL,
+                width: videoWidth,
+                height: videoHeight,
+                timestamp: new Date().toLocaleTimeString('tr-TR')
+            };
+
+            capturedImages.push(imageData);
+
+            // Update UI
+            updateCapturedList();
+            updateCreatePdfButton();
+
+            // Visual feedback
+            flashEffect();
+            showToast(`Fotoğraf çekildi (${capturedImages.length})`, 'success');
+
+            console.log('📸 Photo captured:', videoWidth + 'x' + videoHeight);
+
+        } catch (error) {
+            console.error('Capture error:', error);
+            showToast('Fotoğraf çekilemedi', 'error');
+        }
+    }
+
+    // ============================================
+    // FLASH EFFECT (Visual Feedback)
+    // ============================================
+    function flashEffect() {
+        const container = document.getElementById('cameraContainer');
+        if (!container) return;
+
+        // Create flash overlay
+        const flash = document.createElement('div');
+        flash.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: white;
+            opacity: 0.8;
+            z-index: 100;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        `;
+        container.appendChild(flash);
+
+        // Fade out and remove
+        setTimeout(() => {
+            flash.style.opacity = '0';
+            setTimeout(() => flash.remove(), 300);
+        }, 50);
+    }
+
+    // ============================================
+    // UPDATE CAPTURED LIST
+    // ============================================
+    function updateCapturedList() {
+        const listContainer = document.getElementById('capturedList');
+        if (!listContainer) return;
+
+        listContainer.innerHTML = '';
+
+        if (capturedImages.length === 0) {
+            listContainer.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">Henüz fotoğraf çekilmedi</p>';
+            return;
+        }
+
+        capturedImages.forEach((img, index) => {
             const item = document.createElement('div');
             item.className = 'file-item';
-            item.draggable = true;
-            item.dataset.index = index;
-            item.dataset.id = capture.id;
+            item.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 10px; margin-bottom: 8px;';
             
             item.innerHTML = `
-                <div class="capture-number">${capture.number}</div>
-                <img src="${capture.thumbnail}" alt="" class="file-thumb" style="transform: rotate(${capture.rotation}deg);">
-                <div class="file-info">
-                    <div class="file-name">${capture.name}</div>
-                    <div class="file-size">
-                        ${Utils.formatFileSize(capture.size)} • ${capture.width}x${capture.height}
-                    </div>
+                <img src="${img.dataURL}" alt="Captured ${index + 1}" 
+                     style="width: 60px; height: 45px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color);">
+                <div class="file-info" style="flex: 1;">
+                    <div class="file-name">Fotoğraf ${index + 1}</div>
+                    <div class="file-size">${img.width}x${img.height} • ${img.timestamp}</div>
                 </div>
-                <div class="file-actions">
-                    <button class="rotate-left" title="Rotate Left">
-                        <span>↺</span>
-                    </button>
-                    <button class="rotate-right" title="Rotate Right">
-                        <span>↻</span>
-                    </button>
-                    <button class="delete" title="Delete">
-                        <span>🗑️</span>
-                    </button>
-                </div>
+                <button class="btn btn-secondary" onclick="previewCapturedImage(${index})" style="padding: 6px 10px; font-size: 0.8rem;">
+                    👁️
+                </button>
+                <button class="btn btn-secondary" onclick="downloadCapturedImage(${index})" style="padding: 6px 10px; font-size: 0.8rem;">
+                    💾
+                </button>
+                <button class="file-remove" onclick="removeCapturedImage(${index})" style="padding: 6px 10px;">
+                    ✕
+                </button>
             `;
-            
-            // Add capture number style
-            const numberEl = item.querySelector('.capture-number');
-            if (numberEl) {
-                numberEl.style.cssText = `
-                    position: absolute;
-                    top: 5px;
-                    left: 5px;
-                    background: var(--accent);
-                    color: white;
-                    width: 24px;
-                    height: 24px;
-                    border-radius: 2px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 12px;
-                    font-weight: bold;
-                    z-index: 1;
-                `;
-            }
-            
-            // Make file-item relative for number positioning
-            item.style.position = 'relative';
-            
-            // Rotate left
-            item.querySelector('.rotate-left').addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.rotateCapture(index, -90);
-            });
-            
-            // Rotate right
-            item.querySelector('.rotate-right').addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.rotateCapture(index, 90);
-            });
-            
-            // Delete
-            item.querySelector('.delete').addEventListener('click', (e) => {
-                e.stopPropagation();
-                this.removeCapture(index);
-            });
-            
-            container.appendChild(item);
+
+            listContainer.appendChild(item);
         });
-        
-        // Initialize sortable
-        this.initSortable(container);
-    },
-    
-    /**
-     * Initialize drag & drop sorting
-     */
-    initSortable(container) {
-        let draggedItem = null;
-        
-        container.addEventListener('dragstart', (e) => {
-            if (e.target.classList.contains('file-item')) {
-                draggedItem = e.target;
-                e.target.classList.add('dragging');
-                e.dataTransfer.effectAllowed = 'move';
-            }
-        });
-        
-        container.addEventListener('dragend', (e) => {
-            if (e.target.classList.contains('file-item')) {
-                e.target.classList.remove('dragging');
-                this.reorderFromDOM(container);
-                draggedItem = null;
-            }
-        });
-        
-        container.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            const afterElement = this.getDragAfterElement(container, e.clientY);
-            
-            if (draggedItem) {
-                if (afterElement == null) {
-                    container.appendChild(draggedItem);
-                } else {
-                    container.insertBefore(draggedItem, afterElement);
-                }
-            }
-        });
-    },
-    
-    /**
-     * Get element after drag position
-     */
-    getDragAfterElement(container, y) {
-        const elements = [...container.querySelectorAll('.file-item:not(.dragging)')];
-        
-        return elements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = y - box.top - box.height / 2;
-            
-            if (offset < 0 && offset > closest.offset) {
-                return { offset: offset, element: child };
-            } else {
-                return closest;
-            }
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
-    },
-    
-    /**
-     * Reorder captures from DOM order
-     */
-    reorderFromDOM(container) {
-        const newOrder = [];
-        container.querySelectorAll('.file-item').forEach(item => {
-            const id = item.dataset.id;
-            const capture = this.captures.find(c => c.id === id);
-            if (capture) newOrder.push(capture);
-        });
-        this.captures = newOrder;
-        this.renderCaptureList();
-    },
-    
-    /**
-     * Rotate capture
-     */
-    rotateCapture(index, degrees) {
-        if (this.captures[index]) {
-            this.captures[index].rotation = (this.captures[index].rotation + degrees + 360) % 360;
-            this.renderCaptureList();
+
+        // Add clear all button if multiple images
+        if (capturedImages.length > 1) {
+            const clearAllBtn = document.createElement('button');
+            clearAllBtn.className = 'btn btn-danger';
+            clearAllBtn.style.cssText = 'width: 100%; margin-top: 10px;';
+            clearAllBtn.innerHTML = '🗑️ Tümünü Temizle';
+            clearAllBtn.onclick = clearAllCaptures;
+            listContainer.appendChild(clearAllBtn);
         }
-    },
-    
-    /**
-     * Remove capture
-     */
-    removeCapture(index) {
-        this.captures.splice(index, 1);
-        this.renderCaptureList();
-        
-        if (this.captures.length === 0) {
-            this.captureCounter = 0;
-            Toast.info('All captures removed');
+    }
+
+    // ============================================
+    // REMOVE CAPTURED IMAGE
+    // ============================================
+    window.removeCapturedImage = function(index) {
+        capturedImages.splice(index, 1);
+        updateCapturedList();
+        updateCreatePdfButton();
+        showToast('Fotoğraf silindi', 'info');
+    };
+
+    // ============================================
+    // CLEAR ALL CAPTURES
+    // ============================================
+    window.clearAllCaptures = function() {
+        if (confirm('Tüm fotoğrafları silmek istediğinize emin misiniz?')) {
+            capturedImages = [];
+            updateCapturedList();
+            updateCreatePdfButton();
+            showToast('Tüm fotoğraflar silindi', 'success');
         }
-    },
-    
-    /**
-     * Clear all captures
-     */
-    clearCaptures() {
-        this.captures = [];
-        this.captureCounter = 0;
-        this.renderCaptureList();
-    },
-    
-    /**
-     * Convert captures to PDF
-     */
-    async convertToPDF() {
-        if (this.captures.length === 0) {
-            Toast.error(Lang.get('error.noFiles'));
+    };
+
+    // ============================================
+    // PREVIEW CAPTURED IMAGE
+    // ============================================
+    window.previewCapturedImage = function(index) {
+        const img = capturedImages[index];
+        if (!img) return;
+
+        // Create preview modal
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.id = 'imagePreviewModal';
+        modal.style.zIndex = '3000';
+        modal.innerHTML = `
+            <div class="modal" style="max-width: 90vw; max-height: 90vh; background: #000;">
+                <div class="modal-header">
+                    <span class="modal-title">📷 Fotoğraf ${index + 1}</span>
+                    <button class="modal-close" onclick="document.getElementById('imagePreviewModal').remove()">×</button>
+                </div>
+                <div class="modal-body" style="padding: 0; display: flex; align-items: center; justify-content: center; background: #1a1a1a;">
+                    <img src="${img.dataURL}" alt="Preview" style="max-width: 100%; max-height: 70vh; object-fit: contain;">
+                </div>
+                <div class="modal-footer" style="justify-content: center;">
+                    <button class="btn btn-primary" onclick="downloadCapturedImage(${index}); document.getElementById('imagePreviewModal').remove();">
+                        💾 İndir
+                    </button>
+                    <button class="btn btn-secondary" onclick="document.getElementById('imagePreviewModal').remove()">
+                        Kapat
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Close on backdrop click
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+    };
+
+    // ============================================
+    // DOWNLOAD CAPTURED IMAGE
+    // ============================================
+    window.downloadCapturedImage = function(index) {
+        const img = capturedImages[index];
+        if (!img) return;
+
+        const link = document.createElement('a');
+        link.href = img.dataURL;
+        link.download = `scan_${index + 1}_${Date.now()}.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showToast('Fotoğraf indirildi', 'success');
+    };
+
+    // ============================================
+    // CREATE PDF FROM CAPTURES
+    // ============================================
+    async function createPdfFromCaptures() {
+        if (capturedImages.length === 0) {
+            showToast('Önce fotoğraf çekin', 'warning');
             return;
         }
-        
-        // Check access
-        if (!PlanManager.checkAccess('camera')) {
-            return;
-        }
-        
-        const addPageNumbers = document.getElementById('cameraPageNumbers')?.checked || false;
-        
-        Toast.info(Lang.get('progress.converting'));
-        
+
         try {
+            showToast('PDF oluşturuluyor...', 'info');
+
             const { jsPDF } = window.jspdf;
-            
-            // A4 dimensions in mm
-            const pageWidth = 210;
-            const pageHeight = 297;
-            const margin = 10;
-            
-            let pdf = null;
-            const totalCaptures = this.captures.length;
-            
-            for (let i = 0; i < totalCaptures; i++) {
-                const capture = this.captures[i];
-                
-                // Load and process image
-                const imgData = await this.processImage(capture);
-                
-                // Get processed image dimensions
-                const img = await Utils.loadImage(imgData);
-                
-                // Handle rotation for dimension calculation
-                let imgWidth = img.width;
-                let imgHeight = img.height;
-                
-                if (capture.rotation === 90 || capture.rotation === 270) {
-                    [imgWidth, imgHeight] = [imgHeight, imgWidth];
+
+            // Determine orientation from first image
+            const firstImg = capturedImages[0];
+            const isLandscape = firstImg.width > firstImg.height;
+
+            const pdf = new jsPDF({
+                orientation: isLandscape ? 'landscape' : 'portrait',
+                unit: 'mm'
+            });
+
+            for (let i = 0; i < capturedImages.length; i++) {
+                const img = capturedImages[i];
+
+                if (i > 0) {
+                    // Add new page for subsequent images
+                    const imgLandscape = img.width > img.height;
+                    pdf.addPage(imgLandscape ? 'landscape' : 'portrait');
                 }
-                
-                // Calculate fit dimensions
-                const availableWidth = pageWidth - (margin * 2);
-                const availableHeight = pageHeight - (margin * 2) - (addPageNumbers ? 10 : 0);
-                
-                const imgAspect = imgWidth / imgHeight;
-                const pageAspect = availableWidth / availableHeight;
-                
-                let drawWidth, drawHeight;
-                
-                if (imgAspect > pageAspect) {
-                    drawWidth = availableWidth;
-                    drawHeight = drawWidth / imgAspect;
+
+                // Get page dimensions
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const pageHeight = pdf.internal.pageSize.getHeight();
+
+                // Calculate image dimensions to fit page
+                const imgRatio = img.width / img.height;
+                const pageRatio = pageWidth / pageHeight;
+
+                let drawWidth, drawHeight, offsetX, offsetY;
+
+                if (imgRatio > pageRatio) {
+                    // Image is wider - fit to width
+                    drawWidth = pageWidth - 10; // 5mm margin each side
+                    drawHeight = drawWidth / imgRatio;
+                    offsetX = 5;
+                    offsetY = (pageHeight - drawHeight) / 2;
                 } else {
-                    drawHeight = availableHeight;
-                    drawWidth = drawHeight * imgAspect;
+                    // Image is taller - fit to height
+                    drawHeight = pageHeight - 10; // 5mm margin each side
+                    drawWidth = drawHeight * imgRatio;
+                    offsetX = (pageWidth - drawWidth) / 2;
+                    offsetY = 5;
                 }
-                
-                const drawX = margin + (availableWidth - drawWidth) / 2;
-                const drawY = margin + (availableHeight - drawHeight) / 2;
-                
-                // Create or add page
-                if (i === 0) {
-                    pdf = new jsPDF({
-                        orientation: 'portrait',
-                        unit: 'mm',
-                        format: 'a4'
-                    });
-                } else {
-                    pdf.addPage('a4', 'portrait');
-                }
-                
-                // Add image (already rotated)
-                pdf.addImage(imgData, 'JPEG', drawX, drawY, drawWidth, drawHeight);
-                
-                // Add page number
-                if (addPageNumbers) {
-                    pdf.setFontSize(10);
-                    pdf.setTextColor(100);
-                    pdf.text(
-                        `${i + 1} / ${totalCaptures}`,
-                        pageWidth / 2,
-                        pageHeight - 8,
-                        { align: 'center' }
-                    );
-                }
+
+                // Add image to PDF
+                pdf.addImage(
+                    img.dataURL,
+                    'JPEG',
+                    offsetX,
+                    offsetY,
+                    drawWidth,
+                    drawHeight,
+                    undefined,
+                    'FAST'
+                );
             }
-            
+
+            // Generate filename
+            const timestamp = new Date().toISOString().slice(0, 10);
+            const filename = `scanned_document_${timestamp}.pdf`;
+
             // Save PDF
-            const filename = `scan_${Date.now()}.pdf`;
             pdf.save(filename);
-            
-            // Use free trial
-            PlanManager.useFreeTrial();
-            
-            Toast.success(Lang.get('success.converted'));
-            
+
+            showToast(`PDF oluşturuldu (${capturedImages.length} sayfa)`, 'success');
+
         } catch (error) {
-            console.error('Conversion error:', error);
-            Toast.error(Lang.get('error.processingFailed'));
+            console.error('PDF creation error:', error);
+            showToast('PDF oluşturulamadı: ' + error.message, 'error');
         }
-    },
-    
-    /**
-     * Process image (apply rotation and optimize)
-     */
-    processImage(capture) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
+    }
+
+    // ============================================
+    // UPDATE BUTTON STATES
+    // ============================================
+    function updateButtonStates(cameraActive) {
+        const startBtn = document.getElementById('startCameraBtn');
+        const captureBtn = document.getElementById('captureBtn');
+        const switchBtn = document.getElementById('switchCameraBtn');
+
+        if (startBtn) {
+            startBtn.innerHTML = cameraActive 
+                ? '<span>⏹️</span> Kamerayı Durdur'
+                : '<span>📷</span> Kamerayı Başlat';
             
-            reader.onload = (e) => {
-                const img = new Image();
-                
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    // Calculate dimensions with rotation
-                    const rotation = capture.rotation;
-                    let width = img.width;
-                    let height = img.height;
-                    
-                    // Limit max size for optimization
-                    const maxSize = 2000;
-                    if (width > maxSize || height > maxSize) {
-                        if (width > height) {
-                            height = (height * maxSize) / width;
-                            width = maxSize;
-                        } else {
-                            width = (width * maxSize) / height;
-                            height = maxSize;
-                        }
-                    }
-                    
-                    // Set canvas size based on rotation
-                    if (rotation === 90 || rotation === 270) {
-                        canvas.width = height;
-                        canvas.height = width;
-                    } else {
-                        canvas.width = width;
-                        canvas.height = height;
-                    }
-                    
-                    // White background
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    
-                    // Apply rotation
-                    ctx.translate(canvas.width / 2, canvas.height / 2);
-                    ctx.rotate((rotation * Math.PI) / 180);
-                    
-                    // Draw image centered
-                    if (rotation === 90 || rotation === 270) {
-                        ctx.drawImage(img, -canvas.height / 2, -canvas.width / 2, canvas.height, canvas.width);
-                    } else {
-                        ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
-                    }
-                    
-                    // Apply basic document enhancement
-                    this.enhanceDocument(ctx, canvas.width, canvas.height);
-                    
-                    resolve(canvas.toDataURL('image/jpeg', 0.85));
-                };
-                
-                img.onerror = reject;
-                img.src = e.target.result;
-            };
+            // Change click handler
+            startBtn.onclick = cameraActive ? stopCamera : startCamera;
+        }
+
+        if (captureBtn) {
+            captureBtn.disabled = !cameraActive;
+        }
+
+        if (switchBtn) {
+            switchBtn.disabled = !cameraActive;
+        }
+    }
+
+    function updateCreatePdfButton() {
+        const createPdfBtn = document.getElementById('createScanPdfBtn');
+        if (createPdfBtn) {
+            createPdfBtn.disabled = capturedImages.length === 0;
+        }
+    }
+
+    // ============================================
+    // IMAGE ENHANCEMENT (Optional)
+    // ============================================
+    function enhanceImage(imageData) {
+        // Simple auto-contrast enhancement
+        const data = imageData.data;
+        let min = 255, max = 0;
+
+        // Find min/max values
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            const brightness = (r + g + b) / 3;
             
-            reader.onerror = reject;
-            reader.readAsDataURL(capture.file);
-        });
-    },
-    
-    /**
-     * Basic document enhancement (contrast boost)
-     */
-    enhanceDocument(ctx, width, height) {
-        try {
-            const imageData = ctx.getImageData(0, 0, width, height);
-            const data = imageData.data;
-            
-            // Simple contrast enhancement
-            const contrast = 1.1; // Slight contrast boost
-            const factor = (259 * (contrast * 255 + 255)) / (255 * (259 - contrast * 255));
+            if (brightness < min) min = brightness;
+            if (brightness > max) max = brightness;
+        }
+
+        // Apply contrast stretch
+        const range = max - min;
+        if (range > 0) {
+            const scale = 255 / range;
             
             for (let i = 0; i < data.length; i += 4) {
-                data[i] = Math.min(255, Math.max(0, factor * (data[i] - 128) + 128));     // R
-                data[i + 1] = Math.min(255, Math.max(0, factor * (data[i + 1] - 128) + 128)); // G
-                data[i + 2] = Math.min(255, Math.max(0, factor * (data[i + 2] - 128) + 128)); // B
+                data[i] = Math.min(255, Math.max(0, (data[i] - min) * scale));
+                data[i + 1] = Math.min(255, Math.max(0, (data[i + 1] - min) * scale));
+                data[i + 2] = Math.min(255, Math.max(0, (data[i + 2] - min) * scale));
             }
+        }
+
+        return imageData;
+    }
+
+    // ============================================
+    // APPLY DOCUMENT FILTER (Optional)
+    // ============================================
+    window.applyDocumentFilter = function() {
+        if (capturedImages.length === 0) {
+            showToast('Önce fotoğraf çekin', 'warning');
+            return;
+        }
+
+        showToast('Belge filtresi uygulanıyor...', 'info');
+
+        capturedImages = capturedImages.map((img, index) => {
+            try {
+                // Create temp canvas
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                // Create image element
+                const imgEl = new Image();
+                imgEl.src = img.dataURL;
+
+                // Wait for load
+                return new Promise((resolve) => {
+                    imgEl.onload = function() {
+                        tempCanvas.width = imgEl.width;
+                        tempCanvas.height = imgEl.height;
+
+                        // Draw original
+                        tempCtx.drawImage(imgEl, 0, 0);
+
+                        // Get image data
+                        let imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+
+                        // Apply enhancement
+                        imageData = enhanceImage(imageData);
+
+                        // Apply grayscale for document look
+                        const data = imageData.data;
+                        for (let i = 0; i < data.length; i += 4) {
+                            const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+                            
+                            // Increase contrast for document
+                            const adjusted = gray < 128 ? gray * 0.8 : gray * 1.2;
+                            const final = Math.min(255, Math.max(0, adjusted));
+                            
+                            data[i] = final;
+                            data[i + 1] = final;
+                            data[i + 2] = final;
+                        }
+
+                        // Put back
+                        tempCtx.putImageData(imageData, 0, 0);
+
+                        resolve({
+                            ...img,
+                            dataURL: tempCanvas.toDataURL('image/jpeg', 0.92)
+                        });
+                    };
+                });
+            } catch (error) {
+                console.error('Filter error:', error);
+                return img;
+            }
+        });
+
+        // Wait for all and update
+        Promise.all(capturedImages).then(filtered => {
+            capturedImages = filtered;
+            updateCapturedList();
+            showToast('Belge filtresi uygulandı', 'success');
+        });
+    };
+
+    // ============================================
+    // ROTATE CAPTURED IMAGE
+    // ============================================
+    window.rotateCapturedImage = function(index, degrees = 90) {
+        const img = capturedImages[index];
+        if (!img) return;
+
+        try {
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
             
-            ctx.putImageData(imageData, 0, 0);
+            const imgEl = new Image();
+            imgEl.onload = function() {
+                // Swap dimensions for 90/270 degree rotation
+                if (degrees === 90 || degrees === 270) {
+                    tempCanvas.width = imgEl.height;
+                    tempCanvas.height = imgEl.width;
+                } else {
+                    tempCanvas.width = imgEl.width;
+                    tempCanvas.height = imgEl.height;
+                }
+
+                // Rotate
+                tempCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+                tempCtx.rotate((degrees * Math.PI) / 180);
+                tempCtx.drawImage(imgEl, -imgEl.width / 2, -imgEl.height / 2);
+
+                // Update image data
+                capturedImages[index] = {
+                    ...img,
+                    dataURL: tempCanvas.toDataURL('image/jpeg', 0.92),
+                    width: tempCanvas.width,
+                    height: tempCanvas.height
+                };
+
+                updateCapturedList();
+                showToast('Fotoğraf döndürüldü', 'success');
+            };
+            imgEl.src = img.dataURL;
+
         } catch (error) {
-            // If enhancement fails, continue with original
-            console.warn('Document enhancement skipped:', error);
+            console.error('Rotate error:', error);
+            showToast('Döndürme başarısız', 'error');
         }
-    },
-    
-    /**
-     * Capture new photo (trigger camera input)
-     */
-    captureNew() {
-        const cameraInput = document.getElementById('cameraInput');
-        if (cameraInput) {
-            cameraInput.click();
+    };
+
+    // ============================================
+    // REORDER CAPTURES (Drag & Drop)
+    // ============================================
+    window.moveCaptureUp = function(index) {
+        if (index > 0) {
+            const temp = capturedImages[index];
+            capturedImages[index] = capturedImages[index - 1];
+            capturedImages[index - 1] = temp;
+            updateCapturedList();
         }
-    }
-};
+    };
 
-// ==========================================
-// ADDITIONAL STYLES
-// ==========================================
-const cameraStyles = document.createElement('style');
-cameraStyles.textContent = `
-    /* Camera capture button enhancement */
-    #cameraSection .btn-lg {
-        padding: 20px 40px;
-        font-size: 1.1rem;
-    }
-    
-    #cameraSection .btn-lg:hover {
-        transform: scale(1.02);
-    }
-    
-    /* Capture grid styling */
-    #cameraList .file-item {
-        position: relative;
-    }
-    
-    #cameraList .file-thumb {
-        width: 80px;
-        height: 80px;
-        object-fit: cover;
-    }
-    
-    /* Add more photos button */
-    .add-more-btn {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        width: 100%;
-        padding: 15px;
-        margin-top: 15px;
-        background: var(--bg-secondary);
-        border: 1px dashed var(--border-default);
-        border-radius: 2px;
-        color: var(--text-secondary);
-        cursor: pointer;
-        transition: var(--transition);
-    }
-    
-    .add-more-btn:hover {
-        border-color: var(--border-hover);
-        color: var(--accent);
-    }
-`;
-document.head.appendChild(cameraStyles);
+    window.moveCaptureDown = function(index) {
+        if (index < capturedImages.length - 1) {
+            const temp = capturedImages[index];
+            capturedImages[index] = capturedImages[index + 1];
+            capturedImages[index + 1] = temp;
+            updateCapturedList();
+        }
+    };
 
-// ==========================================
-// INITIALIZATION
-// ==========================================
-document.addEventListener('DOMContentLoaded', () => {
-    Camera.init();
-    
-    // Add "Add More Photos" button to camera section
-    const cameraList = document.getElementById('cameraList');
-    if (cameraList) {
-        const addMoreBtn = document.createElement('label');
-        addMoreBtn.className = 'add-more-btn';
-        addMoreBtn.setAttribute('for', 'cameraInput');
-        addMoreBtn.innerHTML = `
-            <span>📷</span>
-            <span data-i18n="camera.addMore">Add More Photos</span>
-        `;
-        cameraList.parentNode.insertBefore(addMoreBtn, cameraList.nextSibling);
-        
-        // Hide initially, show when there are captures
-        addMoreBtn.style.display = 'none';
-        
-        // Override renderCaptureList to show/hide add more button
-        const originalRender = Camera.renderCaptureList.bind(Camera);
-        Camera.renderCaptureList = function() {
-            originalRender();
-            addMoreBtn.style.display = this.captures.length > 0 ? 'flex' : 'none';
-        };
-    }
-});
+    // ============================================
+    // CLEANUP ON PAGE UNLOAD
+    // ============================================
+    window.addEventListener('beforeunload', function() {
+        stopCamera();
+    });
 
-// ==========================================
-// EXPORT
-// ==========================================
-window.Camera = Camera;
+    // ============================================
+    // VISIBILITY CHANGE (Stop camera when hidden)
+    // ============================================
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden && videoStream) {
+            // Optionally pause when tab is hidden
+            // stopCamera();
+        }
+    });
+
+    // ============================================
+    // EXPOSE PUBLIC API
+    // ============================================
+    window.CameraModule = {
+        start: startCamera,
+        stop: stopCamera,
+        capture: capturePhoto,
+        switch: switchCamera,
+        createPdf: createPdfFromCaptures,
+        getCapturedImages: () => capturedImages,
+        clearAll: clearAllCaptures
+    };
+
+    // ============================================
+    // INITIALIZATION COMPLETE
+    // ============================================
+    console.log('✅ Camera module v2.0 loaded');
+    console.log('📷 Negative issue fixed - Clean JPEG capture');
+
+// End of IIFE
+})();
