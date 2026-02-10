@@ -74,8 +74,7 @@
             max-width: 100%;
             height: auto;
         }
-.canvas-scroll-wrapper { overflow: auto !important; }
-.canvas-wrapper { margin: 20px auto; }
+
         /* ==========================================
            SCROLLBAR
         ========================================== */
@@ -378,10 +377,6 @@
             align-items: center;
             gap: 10px;
             font-size: 1.1rem;
-        }
-
-        .card-body {
-            /* Content area */
         }
 
         .card-footer {
@@ -1048,182 +1043,6 @@
         .flex-between { display: flex; align-items: center; justify-content: space-between; }
         .gap-10 { gap: 10px; }
         .gap-20 { gap: 20px; }
-    }
-        }
-/* ==========================================
-   📱 MOBILE EDITOR FIX - COMPLETE SOLUTION
-========================================== */
-
-/* Mobil Toggle Butonu */
-.mobile-toolbar-toggle {
-    display: none;
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 56px;
-    height: 56px;
-    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-    border: 2px solid #60a5fa;
-    border-radius: 50%;
-    color: white;
-    font-size: 24px;
-    z-index: 9999;
-    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.5);
-    cursor: pointer;
-    align-items: center;
-    justify-content: center;
-}
-
-.mobile-toolbar-toggle:active {
-    transform: scale(0.95);
-}
-
-/* Mobil Toolbar Overlay */
-.mobile-toolbar-overlay {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(10, 10, 15, 0.98);
-    z-index: 9998;
-    overflow-y: auto;
-    padding: 20px;
-}
-
-.mobile-toolbar-overlay.show {
-    display: block;
-}
-
-.mobile-toolbar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid var(--border-default);
-}
-
-.mobile-toolbar-header h3 {
-    margin: 0;
-    color: var(--text-primary);
-}
-
-.mobile-toolbar-close {
-    width: 40px;
-    height: 40px;
-    background: var(--danger);
-    border: none;
-    border-radius: 50%;
-    color: white;
-    font-size: 20px;
-    cursor: pointer;
-}
-
-.mobile-tools-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin-bottom: 20px;
-}
-
-.mobile-tool-btn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 15px 10px;
-    background: var(--bg-card);
-    border: 1px solid var(--border-default);
-    border-radius: 4px;
-    color: var(--text-primary);
-    font-size: 12px;
-    cursor: pointer;
-}
-
-.mobile-tool-btn span:first-child {
-    font-size: 24px;
-    margin-bottom: 5px;
-}
-
-.mobile-tool-btn.active {
-    background: var(--accent);
-    border-color: var(--accent);
-}
-
-.mobile-section-title {
-    font-size: 12px;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    margin: 15px 0 10px 0;
-    padding-top: 15px;
-    border-top: 1px solid var(--border-default);
-}
-
-.mobile-action-buttons {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-}
-
-.mobile-action-buttons .btn {
-    flex: 1;
-}
-
-/* ===== MOBIL MEDIA QUERY ===== */
-@media (max-width: 900px) {
-    /* Toggle butonu göster */
-    .mobile-toolbar-toggle {
-        display: flex;
-    }
-    
-    /* Normal toolbar gizle */
-    .editor-toolbar {
-        display: none !important;
-    }
-    
-    /* Editor container düzelt */
-    #editorContainer {
-        height: calc(100vh - 180px) !important;
-        min-height: 400px !important;
-    }
-    
-    .editor-canvas-container {
-        flex: 1 !important;
-        min-height: 300px !important;
-        overflow: hidden !important;
-    }
-    
-    .canvas-scroll-wrapper {
-        width: 100% !important;
-        height: 100% !important;
-        overflow: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-    }
-    
-    .canvas-wrapper {
-        margin: 20px !important;
-    }
-    
-    #editorCanvas {
-        display: block !important;
-    }
-}
-
-@media (max-width: 480px) {
-    .mobile-tools-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-    
-    .mobile-toolbar-toggle {
-        width: 50px;
-        height: 50px;
-        font-size: 20px;
-        bottom: 15px;
-        right: 15px;
-    }
-}
     </style>
 </head>
 <body>
@@ -1646,8 +1465,7 @@
 
     <!-- Toast Container -->
     <div class="toast-container" id="toastContainer"></div>
-<!-- Mobile Toolbar Toggle Button -->
-<button class="toolbar-toggle" id="toolbarToggle">🛠️</button>
+
     <!-- ==========================================
          CDN LIBRARIES
     ========================================== -->
