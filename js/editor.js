@@ -260,23 +260,23 @@ const Editor = {
                     </div>
                 </div>
                 
-               <!-- Zoom & Page - IMPROVED -->
-<div class="toolbar-group">
-    <div class="toolbar-label">View</div>
-    <div class="toolbar-buttons">
-        <button class="tool-btn" id="zoomOutBtn" title="Zoom Out (-)">
-            <span>➖</span>
-        </button>
-        <input type="range" id="zoomSlider" min="25" max="400" value="100" style="width:100px;">
-        <span class="zoom-level" id="zoomLevel">100%</span>
-        <button class="tool-btn" id="zoomInBtn" title="Zoom In (+)">
-            <span>➕</span>
-        </button>
-        <button class="tool-btn" id="fitBtn" title="Fit to Screen (F)" style="font-size:12px;">
-            <span>FIT</span>
-        </button>
-    </div>
-</div>
+                <!-- Zoom & Page -->
+                <div class="toolbar-group">
+                    <div class="toolbar-label">View</div>
+                    <div class="toolbar-buttons">
+                        <button class="tool-btn" id="zoomOutBtn" title="Zoom Out">
+                            <span>−</span>
+                        </button>
+                        <input type="range" id="zoomSlider" min="50" max="300" value="150" style="width:80px;">
+                        <span class="zoom-level" id="zoomLevel">150%</span>
+                        <button class="tool-btn" id="zoomInBtn" title="Zoom In">
+                            <span>+</span>
+                        </button>
+                        <button class="tool-btn" id="fitBtn" title="Fit to Screen">
+                            <span>⊡</span>
+                        </button>
+                    </div>
+                </div>
                 
                 <!-- Page Navigation -->
                 <div class="toolbar-group">
@@ -306,62 +306,15 @@ const Editor = {
                 </div>
             </div>
             
-           <div class="editor-canvas-container" id="canvasContainer">
-    <div class="canvas-scroll-wrapper" id="canvasScrollWrapper">
-        <div class="canvas-inner">
-            <div class="canvas-wrapper" id="canvasWrapper">
-                <canvas id="editorCanvas"></canvas>
+            <!-- Canvas Container with Scroll -->
+            <div class="editor-canvas-container" id="canvasContainer">
+                <div class="canvas-scroll-wrapper" id="canvasScrollWrapper">
+                    <div class="canvas-wrapper" id="canvasWrapper">
+                        <canvas id="editorCanvas"></canvas>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
-</div>
-           <!-- Mobile Toolbar Toggle -->
-<button class="mobile-toolbar-toggle" id="mobileToolbarToggle">🛠️</button>
-
-<!-- Mobile Toolbar Overlay -->
-<div class="mobile-toolbar-overlay" id="mobileToolbarOverlay">
-    <div class="mobile-toolbar-header">
-        <h3>🛠️ Editor Tools</h3>
-        <button class="mobile-toolbar-close" id="mobileToolbarClose">✕</button>
-    </div>
-    
-    <div class="mobile-section-title">Drawing</div>
-    <div class="mobile-tools-grid">
-        <button class="mobile-tool-btn" data-tool="select"><span>👆</span>Select</button>
-        <button class="mobile-tool-btn" data-tool="pen"><span>✏️</span>Pen</button>
-        <button class="mobile-tool-btn" data-tool="eraser"><span>🧹</span>Eraser</button>
-        <button class="mobile-tool-btn" data-tool="highlight"><span>🖍️</span>Highlight</button>
-    </div>
-    
-    <div class="mobile-section-title">Shapes</div>
-    <div class="mobile-tools-grid">
-        <button class="mobile-tool-btn" data-tool="rect"><span>▢</span>Rect</button>
-        <button class="mobile-tool-btn" data-tool="circle"><span>○</span>Circle</button>
-        <button class="mobile-tool-btn" data-tool="arrow"><span>➤</span>Arrow</button>
-        <button class="mobile-tool-btn" data-tool="line"><span>╱</span>Line</button>
-    </div>
-    
-    <div class="mobile-section-title">Insert</div>
-    <div class="mobile-tools-grid">
-        <button class="mobile-tool-btn" data-tool="text"><span>T</span>Text</button>
-        <button class="mobile-tool-btn" data-tool="note"><span>📝</span>Note</button>
-        <button class="mobile-tool-btn" data-tool="signature"><span>✍️</span>Sign</button>
-        <button class="mobile-tool-btn" data-tool="stamp"><span>🔖</span>Stamp</button>
-    </div>
-    
-    <div class="mobile-section-title">Actions</div>
-    <div class="mobile-tools-grid">
-        <button class="mobile-tool-btn" id="mobileUndo"><span>↶</span>Undo</button>
-        <button class="mobile-tool-btn" id="mobileRedo"><span>↷</span>Redo</button>
-        <button class="mobile-tool-btn" id="mobileFit"><span>⊡</span>Fit</button>
-        <button class="mobile-tool-btn" id="mobileClear"><span>🗑️</span>Clear</button>
-    </div>
-    
-    <div class="mobile-action-buttons">
-        <button class="btn btn-success" id="mobileSave">💾 Save PDF</button>
-        <button class="btn btn-danger" id="mobileRemove">✕ Remove</button>
-    </div>
-</div> 
+            
             <!-- Hidden file input -->
             <input type="file" id="imageInsertInput" accept="image/*" style="display:none;">
         `;
@@ -556,71 +509,58 @@ const Editor = {
                 padding: 8px 16px;
             }
             
-            /* Canvas Container - IMPROVED SCROLL & VIEW */
-.editor-canvas-container {
-    flex: 1;
-    overflow: hidden;
-    background: #1a1a2e;
-    position: relative;
-}
-
-.canvas-scroll-wrapper {
-    width: 100%;
-    height: 100%;
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: var(--accent) var(--bg-secondary);
-}
-
-.canvas-scroll-wrapper::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-}
-
-.canvas-scroll-wrapper::-webkit-scrollbar-track {
-    background: var(--bg-secondary);
-}
-
-.canvas-scroll-wrapper::-webkit-scrollbar-thumb {
-    background: var(--accent);
-    border-radius: 5px;
-}
-
-.canvas-scroll-wrapper::-webkit-scrollbar-thumb:hover {
-    background: var(--accent-hover);
-}
-
-.canvas-inner {
-    min-width: 100%;
-    min-height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 30px;
-}
-
-.canvas-wrapper {
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    background: white;
-    flex-shrink: 0;
-}
-
-#editorCanvas {
-    display: block;
-}
-
-/* Mobile improvements */
-@media (max-width: 768px) {
-    .canvas-inner {
-        padding: 15px;
-        align-items: flex-start;
-    }
-    
-    .canvas-scroll-wrapper {
-        touch-action: pan-x pan-y pinch-zoom;
-    }
-}
+            /* Canvas Container - FIX: Scroll support */
+            .editor-canvas-container {
+                flex: 1;
+                overflow: hidden;
+                background: #2a2a2a;
+                position: relative;
+            }
+            
+            .canvas-scroll-wrapper {
+                width: 100%;
+                height: 100%;
+                overflow: auto;
+                display: flex;
+                align-items: flex-start;
+                justify-content: center;
+                padding: 20px;
+            }
+            
+            .canvas-wrapper {
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+                background: white;
+                flex-shrink: 0;
+            }
+            
+            #editorCanvas {
+                display: block;
+            }
+            
+            /* Responsive */
+            @media (max-width: 1200px) {
+                .editor-toolbar {
+                    gap: 10px;
+                }
+                
+                .save-group {
+                    margin-left: 0;
+                    width: 100%;
+                    justify-content: flex-end;
+                }
+            }
+            
+            @media (max-width: 768px) {
+                .editor-toolbar {
+                    padding: 10px;
+                }
+                
+                .tool-btn {
+                    width: 32px;
+                    height: 32px;
+                    font-size: 14px;
+                }
+            }
         `;
         
         document.head.appendChild(styles);
@@ -726,65 +666,6 @@ const Editor = {
                 e.stopPropagation();
                 const tool = btn.dataset.tool;
                 this.setTool(tool);
-                // Mobile toolbar toggle
-// ===== MOBILE TOOLBAR =====
-const mobileToggle = document.getElementById('mobileToolbarToggle');
-const mobileOverlay = document.getElementById('mobileToolbarOverlay');
-const mobileClose = document.getElementById('mobileToolbarClose');
-
-if (mobileToggle && mobileOverlay) {
-    // Toggle açma
-    mobileToggle.addEventListener('click', () => {
-        mobileOverlay.classList.add('show');
-    });
-    
-    // Kapatma
-    mobileClose?.addEventListener('click', () => {
-        mobileOverlay.classList.remove('show');
-    });
-    
-    // Araç seçince kapat
-    mobileOverlay.querySelectorAll('.mobile-tool-btn[data-tool]').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const tool = btn.dataset.tool;
-            this.setTool(tool);
-            mobileOverlay.classList.remove('show');
-            
-            // Aktif göster
-            mobileOverlay.querySelectorAll('.mobile-tool-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-        });
-    });
-    
-    // Action butonları
-    document.getElementById('mobileUndo')?.addEventListener('click', () => {
-        this.undo();
-    });
-    
-    document.getElementById('mobileRedo')?.addEventListener('click', () => {
-        this.redo();
-    });
-    
-    document.getElementById('mobileFit')?.addEventListener('click', () => {
-        this.fitToScreen();
-        mobileOverlay.classList.remove('show');
-    });
-    
-    document.getElementById('mobileClear')?.addEventListener('click', () => {
-        this.clearAll();
-    });
-    
-    document.getElementById('mobileSave')?.addEventListener('click', () => {
-        mobileOverlay.classList.remove('show');
-        this.savePDF();
-    });
-    
-    document.getElementById('mobileRemove')?.addEventListener('click', () => {
-        mobileOverlay.classList.remove('show');
-        this.removePDF();
-    });
-}
-
             });
         });
         
@@ -1713,7 +1594,6 @@ if (mobileToggle && mobileOverlay) {
         clearTimeout(this._saveTimeout);
         this._saveTimeout = setTimeout(() => {
             // Auto-save state handled by individual tools
-            this.fitToScreen();
         }, 300);
     },
     
@@ -1828,38 +1708,27 @@ if (mobileToggle && mobileOverlay) {
     },
     
     /**
- * Fit to screen - IMPROVED
- */
-fitToScreen() {
-    const container = document.getElementById('canvasScrollWrapper');
-    if (!container || !this.pageImages[this.currentPage - 1]) return;
-    
-    const pageImage = this.pageImages[this.currentPage - 1];
-    const containerWidth = container.clientWidth - 60;
-    const containerHeight = container.clientHeight - 60;
-    
-    const scaleX = containerWidth / (pageImage.width / this.scale);
-    const scaleY = containerHeight / (pageImage.height / this.scale);
-    
-    // Sayfaya sığdır ama çok küçültme
-    const newScale = Math.min(scaleX, scaleY, 2);
-    this.scale = Math.max(0.5, newScale);
-    
-    const slider = document.getElementById('zoomSlider');
-    if (slider) slider.value = Math.round(this.scale * 100);
-    
-    this.updateZoomDisplay();
-    this.reloadCurrentPage();
-    
-    // Scroll to center
-    setTimeout(() => {
-        const wrapper = document.getElementById('canvasScrollWrapper');
-        if (wrapper) {
-            wrapper.scrollTop = 0;
-            wrapper.scrollLeft = (wrapper.scrollWidth - wrapper.clientWidth) / 2;
-        }
-    }, 100);
-},
+     * Fit to screen
+     */
+    fitToScreen() {
+        const container = document.getElementById('canvasScrollWrapper');
+        if (!container || !this.pageImages[this.currentPage - 1]) return;
+        
+        const pageImage = this.pageImages[this.currentPage - 1];
+        const containerWidth = container.clientWidth - 40;
+        const containerHeight = container.clientHeight - 40;
+        
+        const scaleX = containerWidth / pageImage.width;
+        const scaleY = containerHeight / pageImage.height;
+        
+        this.scale = Math.min(scaleX, scaleY);
+        
+        const slider = document.getElementById('zoomSlider');
+        if (slider) slider.value = Math.round(this.scale * 100);
+        
+        this.updateZoomDisplay();
+        this.reloadCurrentPage();
+    },
     
     /**
      * Update zoom display
